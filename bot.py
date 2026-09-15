@@ -1,16 +1,20 @@
 import os
 import logging
 import datetime
-from pathlib import Path
+import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import FSInputFile
+from aiogram.types import BufferedInputFile
 import asyncio
 
 # ==== НАСТРОЙКИ ====
-import os
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-HTML_FILE_PATH = Path(r"C:\dashboard\dashboard.html")
+YANDEX_TOKEN = os.getenv("YANDEX_DISK_TOKEN") # Токен Диска, получим в шаге 4
+
+# Путь к файлу внутри Яндекс.Диска (ЗАМЕНИ НА СВОЙ)
+FILE_PATH_ON_DISK = "FILE_PATH_ON_DISK" 
+
+FILE_NAME = "FILE_NAME"
 # ===================
 
 logging.basicConfig(level=logging.INFO)
@@ -18,63 +22,43 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
+def get_download_link(token, disk_path):
+    """Запрашивает у API Яндекс.Диска временную прямую ссылку на файл."""
+    url = "https://cloud-api.yandex.net/v1/disk/resources/download"
+    headers = {"Authorization": f"OAuth {token}"}
+    params = {"path": disk_path}
+    
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        return response.json().get("href")
+    else:
+        # Если ошибка — выводим её в лог
+        raise Exception(f"API Диска вернул {response.status_code}: {response.text}")
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer(
-        "Привет! Я отдаю HTML-дашборд с сервера 1С.\n\n"
-        "Команды:\n"
-        "/get — получить файл\n"
-        "/status — информация о файле"
-    )
-
+    await message.answer("Привет! /get — получить дашборд.")
 
 @dp.message(Command("get"))
 async def cmd_get(message: types.Message):
-    if not HTML_FILE_PATH.exists():
-        await message.answer(
-            f"Файл не найден:\n{HTML_FILE_PATH}\n\n"
-            "Проверь, что 1С выгрузила дашборд."
-        )
-        return
-
+    await message.answer("Готовлю файл...")
     try:
-        stat = HTML_FILE_PATH.stat()
-        mtime = datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%d.%m.%Y %H:%M")
+        # 1. Получаем прямую ссылку через API
+        download_url = get_download_link(YANDEX_TOKEN, FILE_PATH_ON_DISK)
+        
+        # 2. Скачиваем файл по этой ссылке
+        file_response = requests.get(download_url, timeout=30)
+        file_response.raise_for_status()
 
-        document = FSInputFile(HTML_FILE_PATH, filename="dashboard.html")
-        await message.answer_document(
-            document,
-            caption=f"Дашборд от {mtime}"
-        )
+        # 3. Отправляем в Telegram
+        file = BufferedInputFile(file_response.content, filename=FILE_NAME)
+        await message.answer_document(file, caption=f"Дашборд от {datetime.datetime.now().strftime('%d.%m.%Y %H:%M')}")
     except Exception as e:
-        logging.exception("Ошибка отправки")
+        logging.exception("Ошибка")
         await message.answer(f"Ошибка: {e}")
 
-
-@dp.message(Command("status"))
-async def cmd_status(message: types.Message):
-    if not HTML_FILE_PATH.exists():
-        await message.answer("Файл ещё не создан.")
-        return
-
-    stat = HTML_FILE_PATH.stat()
-    mtime = datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%d.%m.%Y %H:%M:%S")
-    size_kb = stat.st_size / 1024
-
-    await message.answer(
-        f"Файл: dashboard.html\n"
-        f"Размер: {size_kb:.1f} КБ\n"
-        f"Обновлён: {mtime}"
-    )
-
-
 async def main():
-    print("Бот запущен.")
-    print(f"Путь к файлу: {HTML_FILE_PATH}")
-    print(f"Файл существует: {HTML_FILE_PATH.exists()}")
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
