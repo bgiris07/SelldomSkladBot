@@ -15,7 +15,9 @@ import asyncio
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 YANDEX_TOKEN = os.getenv("YANDEX_DISK_TOKEN")
 
-MAIN_DASHBOARD_PATH = os.getenv("FILE_PATH_ON_DISK", "/dashboard.html")
+# Пути к файлам на Яндекс.Диске
+KLADOVSHCHIKI_PATH = os.getenv("KLADOVSHCHIKI_PATH", "/kladovshchiki.html")
+SBORSHCHIKI_PATH = os.getenv("SBORSHCHIKI_PATH", "/sborshchiki.html")
 # ===================
 
 logging.basicConfig(level=logging.INFO)
@@ -38,27 +40,14 @@ def get_download_link(token, disk_path):
 
 
 def clean_html(html: str) -> str:
-    """
-    Убирает служебные теги, оставляя только содержимое <body>.
-    Telegram понимает не всё — поэтому чистим.
-    """
-    # 1. Убираем DOCTYPE
+    """Убирает служебные теги, оставляя только содержимое <body>."""
     html = re.sub(r"<!DOCTYPE[^>]*>", "", html, flags=re.IGNORECASE)
-    
-    # 2. Убираем блок <head>...</head> целиком
     html = re.sub(r"<head[^>]*>.*?</head>", "", html, flags=re.IGNORECASE | re.DOTALL)
-    
-    # 3. Убираем теги <html>, </html>, <body>, </body>
     html = re.sub(r"</?html[^>]*>", "", html, flags=re.IGNORECASE)
     html = re.sub(r"</?body[^>]*>", "", html, flags=re.IGNORECASE)
-    
-    # 4. Убираем <style>...</style> и <script>...</script> (Telegram их всё равно не понимает)
     html = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.IGNORECASE | re.DOTALL)
     html = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.IGNORECASE | re.DOTALL)
-    
-    # 5. Убираем лишние пустые строки
     html = re.sub(r"\n\s*\n", "\n", html)
-    
     return html.strip()
 
 
@@ -71,7 +60,6 @@ async def send_html_as_rich(message: types.Message, disk_path: str):
     file_response.encoding = "utf-8"
     html_content = file_response.text
     
-    # Чистим HTML от служебных тегов
     cleaned = clean_html(html_content)
     
     await message.answer_rich(
@@ -80,13 +68,13 @@ async def send_html_as_rich(message: types.Message, disk_path: str):
 
 
 def get_main_keyboard():
-    """Главное меню: одна кнопка Дашборд."""
+    """Главное меню: две кнопки — Кладовщики и Сборщики."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📊 Дашборд")],
+            [KeyboardButton(text="📦 Кладовщики"), KeyboardButton(text="🛒 Сборщики")],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Нажмите кнопку..."
+        input_field_placeholder="Выберите раздел..."
     )
     return keyboard
 
@@ -94,16 +82,26 @@ def get_main_keyboard():
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Нажмите кнопку ниже, чтобы получить дашборд:",
+        "Привет! Выберите раздел:",
         reply_markup=get_main_keyboard()
     )
 
 
-@dp.message(F.text == "📊 Дашборд")
-async def btn_dashboard(message: types.Message):
-    await message.answer("Загружаю дашборд...")
+@dp.message(F.text == "📦 Кладовщики")
+async def btn_kladovshchiki(message: types.Message):
+    await message.answer("Загружаю статистику кладовщиков...")
     try:
-        await send_html_as_rich(message, MAIN_DASHBOARD_PATH)
+        await send_html_as_rich(message, KLADOVSHCHIKI_PATH)
+    except Exception as e:
+        logging.exception("Ошибка")
+        await message.answer(f"Ошибка: {e}")
+
+
+@dp.message(F.text == "🛒 Сборщики")
+async def btn_sborshchiki(message: types.Message):
+    await message.answer("Загружаю статистику сборщиков...")
+    try:
+        await send_html_as_rich(message, SBORSHCHIKI_PATH)
     except Exception as e:
         logging.exception("Ошибка")
         await message.answer(f"Ошибка: {e}")
