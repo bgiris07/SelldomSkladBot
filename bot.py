@@ -9,12 +9,9 @@ import asyncio
 
 # ==== НАСТРОЙКИ ====
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-YANDEX_TOKEN = os.getenv("YANDEX_DISK_TOKEN") # Токен Диска, получим в шаге 4
-
-# Путь к файлу внутри Яндекс.Диска (ЗАМЕНИ НА СВОЙ)
-FILE_PATH_ON_DISK = "FILEPATHONDISK" 
-
-FILE_NAME = "FILENAME"
+YANDEX_TOKEN = os.getenv("YANDEX_DISK_TOKEN")
+FILE_PATH_ON_DISK = os.getenv("FILE_PATH_ON_DISK", "/dashboard.html")
+FILE_NAME = os.getenv("FILE_NAME", "dashboard.html")
 # ===================
 
 logging.basicConfig(level=logging.INFO)
