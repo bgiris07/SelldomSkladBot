@@ -15,7 +15,6 @@ import asyncio
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 YANDEX_TOKEN = os.getenv("YANDEX_DISK_TOKEN")
 
-# Пути к файлам на Яндекс.Диске
 KLADOVSHCHIKI_PATH = os.getenv("KLADOVSHCHIKI_PATH", "/kladovshchiki.html")
 SBORSHCHIKI_PATH = os.getenv("SBORSHCHIKI_PATH", "/sborshchiki.html")
 # ===================
@@ -27,11 +26,9 @@ dp = Dispatcher()
 
 
 def get_download_link(token, disk_path):
-    """Запрашивает у API Яндекс.Диска временную прямую ссылку на файл."""
     url = "https://cloud-api.yandex.net/v1/disk/resources/download"
     headers = {"Authorization": f"OAuth {token}"}
     params = {"path": disk_path}
-    
     response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
         return response.json().get("href")
@@ -40,7 +37,6 @@ def get_download_link(token, disk_path):
 
 
 def clean_html(html: str) -> str:
-    """Убирает служебные теги, оставляя только содержимое <body>."""
     html = re.sub(r"<!DOCTYPE[^>]*>", "", html, flags=re.IGNORECASE)
     html = re.sub(r"<head[^>]*>.*?</head>", "", html, flags=re.IGNORECASE | re.DOTALL)
     html = re.sub(r"</?html[^>]*>", "", html, flags=re.IGNORECASE)
@@ -52,26 +48,23 @@ def clean_html(html: str) -> str:
 
 
 async def send_html_as_rich(message: types.Message, disk_path: str):
-    """Скачивает HTML, чистит и отправляет как Rich Message."""
     download_url = get_download_link(YANDEX_TOKEN, disk_path)
     file_response = requests.get(download_url, timeout=30)
     file_response.raise_for_status()
-    
     file_response.encoding = "utf-8"
     html_content = file_response.text
-    
     cleaned = clean_html(html_content)
-    
     await message.answer_rich(
         rich_message=InputRichMessage(html=cleaned),
     )
 
 
 def get_main_keyboard():
-    """Главное меню: две кнопки — Кладовщики и Сборщики."""
+    """Главное меню: Кладовщики, Сборщики, Обновить."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📦 Кладовщики"), KeyboardButton(text="🛒 Сборщики")],
+            [KeyboardButton(text="🔄 Обновить")],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите раздел..."
@@ -105,6 +98,15 @@ async def btn_sborshchiki(message: types.Message):
     except Exception as e:
         logging.exception("Ошибка")
         await message.answer(f"Ошибка: {e}")
+
+
+@dp.message(F.text == "🔄 Обновить")
+async def btn_refresh(message: types.Message):
+    """Принудительно перерисовывает клавиатуру у пользователя."""
+    await message.answer(
+        "Клавиатура обновлена ✅",
+        reply_markup=get_main_keyboard()
+    )
 
 
 async def main():
