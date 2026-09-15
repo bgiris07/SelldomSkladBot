@@ -12,9 +12,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 YANDEX_TOKEN = os.getenv("YANDEX_DISK_TOKEN") # Токен Диска, получим в шаге 4
 
 # Путь к файлу внутри Яндекс.Диска (ЗАМЕНИ НА СВОЙ)
-FILE_PATH_ON_DISK = "FILE_PATH_ON_DISK" 
+FILE_PATH_ON_DISK = "FILEPATHONDISK" 
 
-FILE_NAME = "FILE_NAME"
+FILE_NAME = "FILENAME"
 # ===================
 
 logging.basicConfig(level=logging.INFO)
